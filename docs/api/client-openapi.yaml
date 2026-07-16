@@ -1,0 +1,243 @@
+openapi: 3.1.0
+info:
+  title: Printf Client Agent Protocol
+  version: 0.0.2
+  description: >-
+    Public v0 contract used by the official Printf Client. HTTP paths are not
+    versioned yet and may change before v1.
+  license:
+    name: Printf Client Binary Distribution License 1.0
+    url: https://github.com/lprintf/printf-client-releases/blob/main/LICENSE.md
+servers:
+  - url: https://moon.lprintf.com
+paths:
+  /api/client/join:
+    post:
+      summary: Register a Client WireGuard public key and fetch Node peers
+      operationId: clientJoin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JoinRequest'
+      responses:
+        '200':
+          description: Valid token; nodes may be empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          description: Request validation failed
+  /api/client/heartbeat:
+    post:
+      summary: Update Client liveness and exchange configuration versions
+      operationId: clientHeartbeat
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeartbeatRequest'
+      responses:
+        '200':
+          description: Heartbeat accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HeartbeatResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '422':
+          description: Request validation failed
+  /api/client/routes:
+    get:
+      summary: Fetch the complete Bridge relay route snapshot
+      operationId: getClientRoutes
+      security:
+        - PrintfToken: []
+      responses:
+        '200':
+          description: Complete route snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoutesResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    PrintfToken:
+      type: apiKey
+      in: header
+      name: X-Printf-Token
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    JoinRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - client_pubkey
+      properties:
+        token:
+          type: string
+        client_pubkey:
+          type: string
+          description: Base64-encoded WireGuard X25519 public key
+        capabilities:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+          default: []
+          examples:
+            - []
+            - [bridge_tcp_relay_v1]
+    NodeDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - server_pubkey
+        - assigned_ip
+        - endpoint
+        - allowed_ips
+      properties:
+        server_pubkey:
+          type: string
+        assigned_ip:
+          type: string
+          examples: [10.30.0.15/24]
+        endpoint:
+          type: string
+          examples: [203.0.113.10:51820]
+        allowed_ips:
+          type: string
+          examples: [10.30.0.0/24]
+    JoinResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - nodes
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeDetail'
+    RouteStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - mapping_id
+        - state
+      properties:
+        mapping_id:
+          type: integer
+          format: int64
+        state:
+          type: string
+          enum:
+            - listening
+            - active
+            - unresolved
+            - duplicate_alias
+            - connect_error
+            - bind_error
+        error:
+          type:
+            - string
+            - 'null'
+          maxLength: 240
+    HeartbeatRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+      properties:
+        token:
+          type: string
+        route_statuses:
+          type: array
+          maxItems: 512
+          items:
+            $ref: '#/components/schemas/RouteStatus'
+          default: []
+    HeartbeatResponse:
+      type: object
+      additionalProperties: true
+      required:
+        - status
+        - config_version
+        - route_version
+      properties:
+        status:
+          type: string
+          const: ok
+        config_version:
+          type: integer
+          format: int64
+        route_version:
+          type: integer
+          format: int64
+    ClientRoute:
+      type: object
+      additionalProperties: false
+      required:
+        - mapping_id
+        - listen_port
+        - target_host
+        - target_port
+      properties:
+        mapping_id:
+          type: integer
+          format: int64
+        listen_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        target_host:
+          type: string
+        target_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+    RoutesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - version
+        - routes
+      properties:
+        version:
+          type: integer
+          format: int64
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientRoute'
+    Error:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          description: Human-readable error detail or validation details

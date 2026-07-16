@@ -1,0 +1,57 @@
+name: Client bug
+description: Report a reproducible Printf Client problem without secrets
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include Client tokens, WireGuard private keys, complete configs, or production credentials.
+  - type: input
+    id: version
+    attributes:
+      label: Client version
+      placeholder: client-v0.0.2
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux amd64
+        - Linux arm64
+        - macOS Intel
+        - macOS Apple Silicon
+        - Windows amd64
+        - Docker host mode
+        - Docker bridge mode
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: Describe expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      description: Remove token, private key, full WireGuard config, private domains and sensitive IPs.
+      render: text
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Secret check
+      options:
+        - label: I removed all tokens, private keys and credentials.
+          required: true

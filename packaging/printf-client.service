@@ -1,0 +1,16 @@
+[Unit]
+Description=Printf Native Client
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PRINTF_RUNTIME_MODE=native
+EnvironmentFile=/etc/printf-client.env
+ExecStart=/usr/local/bin/printf-client
+Restart=always
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
