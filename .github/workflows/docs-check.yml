@@ -1,0 +1,50 @@
+name: Check public documentation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reject trailing whitespace
+        run: |
+          if git grep -n '[[:blank:]]$' -- '*.md' '*.yaml' '*.yml'; then
+            exit 1
+          fi
+
+      - name: Reject credential-shaped text
+        run: |
+          if rg -n '(sk-[A-Za-z0-9_-]{32,}|gh[opsu]_[A-Za-z0-9]{30,}|BEGIN [A-Z ]*PRIVATE KEY)' .; then
+            exit 1
+          fi
+
+      - name: Check local Markdown links
+        run: |
+          while IFS= read -r -d '' file; do
+            while IFS= read -r link; do
+              case "${link}" in
+                http*|mailto:*|\#*|'') continue ;;
+              esac
+              target=${link%%#*}
+              test -e "$(dirname "${file}")/${target}" || {
+                echo "Broken link: ${file} -> ${link}" >&2
+                exit 1
+              }
+            done < <(sed -nE 's/.*\]\(([^)]+)\).*/\1/p' "${file}")
+          done < <(find . -name '*.md' -type f -print0)
+
+      - name: Lint Agent Protocol OpenAPI
+        run: |
+          docker run --rm \
+            -v "${PWD}:/spec" \
+            redocly/cli@sha256:fed5365e29eb4113075ec4e40c63d7902c971c8d95e73efeb0be0c405a7c1308 \
+            lint /spec/docs/api/client-openapi.yaml
