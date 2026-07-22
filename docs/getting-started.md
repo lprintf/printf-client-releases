@@ -1,6 +1,6 @@
 # 开始使用
 
-本文从控制面生成 token 开始，完成 Native Client 的下载、校验、安装和首次运行。
+本文从控制面生成 token 开始，优先通过 Docker Compose 启动 Client；没有 Docker 时，再使用 Native Client。
 
 ## 1. 前提
 
@@ -13,9 +13,41 @@
 - 管理员权限。
 - 目标服务监听在 `0.0.0.0:target_port` 或 WireGuard 地址。
 
-Native Client 不需要 Docker，但需要操作系统对应的 WireGuard 工具。
+Linux 主机已有 Docker 时优先使用 Compose。镜像已包含 WireGuard 和网络工具，宿主机不需要额外安装。Native Client 不需要 Docker，但需要操作系统对应的 WireGuard 工具。
 
-## 2. 保存 token
+## 2. Docker Compose
+
+在仓库根目录创建环境文件：
+
+```bash
+cp .env.example .env
+chmod 0600 .env
+```
+
+编辑 `.env`：
+
+```dotenv
+PRINTF_TOKEN=replace-with-client-token
+PRINTF_SERVER=https://moon.example.com
+PRINTF_IMAGE=lprintf/printf:v0.2
+```
+
+启动并检查：
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose ps
+docker compose logs --tail 100 printf-client
+```
+
+需要 Alpine 变体时，把 `PRINTF_IMAGE` 改为 `lprintf/printf:alpine-v0.2`。两个镜像都已包含 Client 所需工具，不要在宿主机重复安装 `wireguard-tools`。
+
+`.env` 和 `wg_data/` 已被 Git 忽略。不要提交 token、私钥或完整 WireGuard 配置。同一个 token 不应同时运行 Compose 与 Native Client。
+
+以下步骤只适用于没有 Docker 或需要原生运行的主机。
+
+## 3. Native 保存 token
 
 不要把真实 token 写进本文示例、Git 仓库或 Issue。
 
@@ -35,7 +67,7 @@ $env:PRINTF_SERVER = "https://moon.example.com"
 
 同一个 token 不应同时运行两个 Client。控制面会拒绝在线 Client 使用同一 token 注册不同 WireGuard 公钥。
 
-## 3. 选择下载包
+## 4. Native 选择下载包
 
 确认系统架构：
 
@@ -63,7 +95,7 @@ Windows 当前提供 amd64 版本。
 
 从 [Releases](https://github.com/lprintf/printf-client-releases/releases) 下载压缩包及同名 `.sha256`。
 
-## 4. 验证哈希
+## 5. Native 验证哈希
 
 Linux：
 
@@ -87,7 +119,7 @@ if ($actual -ne $expected) { throw "SHA-256 mismatch" }
 
 哈希不一致时不要运行文件，重新从官方 Release 下载。
 
-## 5. 安装 WireGuard
+## 6. Native 安装 WireGuard
 
 Linux Debian/Ubuntu：
 
@@ -104,7 +136,7 @@ brew install wireguard-tools
 
 Windows：从 WireGuard 官方网站安装 WireGuard for Windows。Client 会调用安装目录中的 `wireguard.exe` 管理 tunnel service。
 
-## 6. 前台运行
+## 7. Native 前台运行
 
 Linux amd64：
 
@@ -140,7 +172,7 @@ $env:PRINTF_RUNTIME_MODE = "native"
 .\printf-client.exe
 ```
 
-## 7. 预期日志
+## 8. 预期日志
 
 首次启动会生成 WireGuard key：
 
@@ -155,7 +187,7 @@ Client is running
 
 如果响应没有 active Node，Client 会明确退出，不会伪装在线。
 
-## 8. 运行服务
+## 9. Native 后台运行
 
 Linux 可以安装仓库提供的 systemd unit：
 
@@ -182,7 +214,7 @@ sudo systemctl status printf-client --no-pager
 
 macOS 和 Windows 当前先以前台或管理员自行管理的服务方式运行。WireGuard tunnel service 不能替代 Printf Client 进程；Client 进程必须持续运行以发送 heartbeat 和接收配置更新。
 
-## 9. 创建 direct Mapping
+## 10. 创建 direct Mapping
 
 在控制面把 Target Service 设置为默认本地端口，例如：
 
@@ -204,9 +236,16 @@ http://[默认本地]:8080
 
 无法接收 Node 通过 WireGuard 发来的流量。
 
-## 10. 验证
+## 11. 验证
 
-Linux：
+Docker Compose：
+
+```bash
+docker compose ps
+docker compose logs --tail 100 printf-client
+```
+
+Linux Native：
 
 ```bash
 sudo wg show

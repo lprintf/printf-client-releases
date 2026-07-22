@@ -27,7 +27,9 @@ Native GitHub Release 与 Docker 镜像使用独立版本线。当前 Docker 镜
 | `lprintf/printf:v0.2` | Ubuntu 22.04 | 默认通用变体。 |
 | `lprintf/printf:alpine-v0.2` | Alpine Linux | 精简变体。 |
 
-拉取镜像：
+Linux 主机已有 Docker 时，优先使用本仓库的 `docker-compose.yml`。镜像已经包含 `wireguard-tools`、`iptables`、`iproute2` 和 CA 证书，宿主机不需要额外安装 `wg`、`wg-quick` 或其他 Client 辅助工具。
+
+单独拉取镜像：
 
 ```bash
 docker pull lprintf/printf:v0.2
@@ -36,11 +38,31 @@ docker pull lprintf/printf:alpine-v0.2
 
 两个镜像都是 Linux 容器镜像。`alpine` 表示容器基础系统，不表示 Windows 原生版本；Windows、macOS 原生运行仍使用 GitHub Release 中对应平台的二进制。
 
+Compose 不挂载 Docker socket，token、WireGuard 私钥和配置只持久化到本目录的 `.env` 与 `wg_data/`，便于限制权限、升级和完整回收。Client 仍需要 `privileged`、`NET_ADMIN` 和 host network；不要把它当作最小权限安全沙箱。
+
 ## 最短运行路径
 
 先在 Printf 控制面创建 Client 并取得 token。token 是高价值 bearer credential，不要提交到 Git、粘贴到 Issue 或发送给其他人。
 
-Linux/macOS 安装对应的 WireGuard 工具后，以管理员权限运行：
+Linux 已有 Docker 时：
+
+```bash
+cp .env.example .env
+chmod 0600 .env
+```
+
+编辑 `.env` 写入真实 token 和控制面地址，然后启动：
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose ps
+docker compose logs --tail 100 printf-client
+```
+
+默认使用 `lprintf/printf:v0.2`。需要 Alpine 变体时，把 `.env` 中的 `PRINTF_IMAGE` 改为 `lprintf/printf:alpine-v0.2`。
+
+没有 Docker，或需要 Windows/macOS 原生运行时，再下载 Native Client。Linux/macOS 安装对应的 WireGuard 工具后，以管理员权限运行：
 
 ```bash
 sudo env \
@@ -72,11 +94,11 @@ Client is running
 
 | 模式 | 用途 | 支持 Docker alias |
 | --- | --- | --- |
-| Native Client | Windows、Linux、macOS 独立主机上的本地服务 | 否 |
 | Docker host-mode Client | Linux 宿主机上的本地服务 | 否 |
 | Docker Bridge Client | 同机 Node 或跨 Compose service alias | 是 |
+| Native Client | 没有 Docker，或需要 Windows、macOS 原生运行 | 否 |
 
-公开 GitHub Release 当前重点支持 Native Client。Native Client 的 direct Mapping 数据路径为：
+本仓库根目录 Compose 提供 Docker host-mode。公开 GitHub Release 继续提供 Native Client 二进制。Native Client 的 direct Mapping 数据路径为：
 
 ```text
 Internet -> Public Node -> WireGuard -> Client printf0 IP:target_port
@@ -90,7 +112,7 @@ Native Client 不解析 Docker service alias，也不能设置 `PRINTF_BRIDGE_MO
 
 | 文档 | 用途 |
 | --- | --- |
-| [开始使用](docs/getting-started.md) | 从 token、下载到首次运行。 |
+| [开始使用](docs/getting-started.md) | 从 token、Compose 或 Native 到首次运行。 |
 | [配置参考](docs/configuration.md) | 环境变量、数据目录和接口名。 |
 | [平台安装](docs/platforms.md) | Linux、macOS、Windows 安装方法。 |
 | [网络与 Mapping](docs/networking.md) | direct Mapping、监听地址和同机限制。 |
