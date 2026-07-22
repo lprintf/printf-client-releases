@@ -1,10 +1,10 @@
 # Printf Client Releases
 
-本仓库公开分发官方 Printf Client 二进制、安装文档和 Client 公共协议说明。
+本仓库公开分发官方 Printf Client 二进制、Docker 镜像版本、安装文档和 Client 公共协议说明。
 
 当前阶段不包含 Client 源码。控制面、Admin API、Node SSH 部署逻辑和生产环境配置也不在本仓库公开范围内。
 
-## 下载
+## Native 二进制下载
 
 从 [Latest Release](https://github.com/lprintf/printf-client-releases/releases/latest) 下载对应平台的压缩包：
 
@@ -17,6 +17,24 @@
 | Windows | x86_64 / amd64 | `printf-client-windows-amd64.zip` |
 
 每个压缩包都附带 `.sha256` 文件。当前发布包尚未提供 macOS notarization、Windows Authenticode 或独立的发布签名；SHA-256 只能验证文件完整性，不能替代发布者签名。
+
+## Docker 镜像
+
+Native GitHub Release 与 Docker 镜像使用独立版本线。当前 Docker 镜像为：
+
+| 镜像 | 运行时基础 | 用途 |
+| --- | --- | --- |
+| `lprintf/printf:v0.2` | Ubuntu 22.04 | 默认通用变体。 |
+| `lprintf/printf:alpine-v0.2` | Alpine Linux | 精简变体。 |
+
+拉取镜像：
+
+```bash
+docker pull lprintf/printf:v0.2
+docker pull lprintf/printf:alpine-v0.2
+```
+
+两个镜像都是 Linux 容器镜像。`alpine` 表示容器基础系统，不表示 Windows 原生版本；Windows、macOS 原生运行仍使用 GitHub Release 中对应平台的二进制。
 
 ## 最短运行路径
 
@@ -58,7 +76,7 @@ Client is running
 | Docker host-mode Client | Linux 宿主机上的本地服务 | 否 |
 | Docker Bridge Client | 同机 Node 或跨 Compose service alias | 是 |
 
-公开 Release 当前重点支持 Native Client。Native Client 的 direct Mapping 数据路径为：
+公开 GitHub Release 当前重点支持 Native Client。Native Client 的 direct Mapping 数据路径为：
 
 ```text
 Internet -> Public Node -> WireGuard -> Client printf0 IP:target_port
@@ -120,7 +138,7 @@ GET  /api/client/routes    # 仅 Bridge Client
 
 ## 版本与发布来源
 
-公开二进制由私有 `lprintf/printf-next` 仓库的 GitHub Actions 构建。每个 Release 会记录对应的源码 commit SHA 和构建 run。
+公开二进制由私有 `lprintf/printf-next` 仓库的 GitHub Actions 构建。每个 GitHub Release 会记录对应的源码 commit SHA 和构建 run。Docker 镜像使用上文列出的独立版本标签，不要用 Native Release 版本推断 Docker 标签。
 
 公开仓库不接受二进制形式的第三方“重新打包版本”。请只从本仓库 GitHub Releases 下载官方文件。
 

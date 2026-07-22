@@ -12,7 +12,7 @@ body:
     id: version
     attributes:
       label: Client version
-      placeholder: client-v0.0.2
+      placeholder: client-v0.0.2 or Docker v0.2
     validations:
       required: true
   - type: dropdown
