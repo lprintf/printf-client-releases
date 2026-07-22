@@ -25,9 +25,9 @@ Native GitHub Release 与 Docker 镜像使用独立版本线。当前 Docker 镜
 | 镜像 | 运行时基础 | 用途 |
 | --- | --- | --- |
 | `lprintf/printf:v0.2` | Ubuntu 22.04 | 默认通用变体。 |
-| `lprintf/printf:alpine-v0.2` | Alpine Linux | 精简变体。 |
+| `lprintf/printf:alpine-v0.2` | Alpine Linux | Windows Docker Desktop 验证变体。 |
 
-Linux 主机已有 Docker 时，优先使用本仓库的 `docker-compose.yml`。镜像已经包含 `wireguard-tools`、`iptables`、`iproute2` 和 CA 证书，宿主机不需要额外安装 `wg`、`wg-quick` 或其他 Client 辅助工具。
+主机已有 Docker 时，优先使用本仓库的 Compose。镜像已经包含 `wireguard-tools`、`iptables`、`iproute2` 和 CA 证书，宿主机不需要额外安装 `wg`、`wg-quick` 或其他 Client 辅助工具。
 
 单独拉取镜像：
 
@@ -36,15 +36,15 @@ docker pull lprintf/printf:v0.2
 docker pull lprintf/printf:alpine-v0.2
 ```
 
-两个镜像都是 Linux 容器镜像。`alpine` 表示容器基础系统，不表示 Windows 原生版本；Windows、macOS 原生运行仍使用 GitHub Release 中对应平台的二进制。
+两个镜像都是 Linux 容器镜像。`alpine` 表示 Windows Docker Desktop 已验证的容器变体，不表示 Windows 原生二进制。Linux 和 macOS Docker 默认使用通用 `v0.2`；无 Docker 时再使用对应平台的 Native Release。
 
-Compose 不挂载 Docker socket，token、WireGuard 私钥和配置只持久化到本目录的 `.env` 与 `wg_data/`，便于限制权限、升级和完整回收。Client 仍需要 `privileged`、`NET_ADMIN` 和 host network；不要把它当作最小权限安全沙箱。
+Compose 不挂载 Docker socket，token、WireGuard 私钥和配置只持久化到本目录的 `.env` 与 `wg_data/`。Client 需要 `privileged` 和 `NET_ADMIN`，但不使用 host network；不要把它当作最小权限安全沙箱。
 
 ## 最短运行路径
 
 先在 Printf 控制面创建 Client 并取得 token。token 是高价值 bearer credential，不要提交到 Git、粘贴到 Issue 或发送给其他人。
 
-Linux 已有 Docker 时：
+已有 Docker 时，在 Git Bash 或其他兼容 shell 中：
 
 ```bash
 cp .env.example .env
@@ -54,13 +54,22 @@ chmod 0600 .env
 编辑 `.env` 写入真实 token 和控制面地址，然后启动：
 
 ```bash
+docker network inspect gateway >/dev/null 2>&1 || docker network create gateway
 docker compose pull
 docker compose up -d
 docker compose ps
 docker compose logs --tail 100 printf-client
 ```
 
-默认使用 `lprintf/printf:v0.2`。需要 Alpine 变体时，把 `.env` 中的 `PRINTF_IMAGE` 改为 `lprintf/printf:alpine-v0.2`。
+默认 `docker-compose.yml` 使用通用 `lprintf/printf:v0.2`。Windows Docker Desktop 使用验证过的 Alpine 变体：
+
+```bash
+docker compose -f docker-compose.alpine.yml pull
+docker compose -f docker-compose.alpine.yml up -d
+docker compose -f docker-compose.alpine.yml ps
+```
+
+应用 Compose 参考 [compose.service.yml](compose.service.yml)：只把公网 HTTP 入口加入同一个 `gateway` external network，并声明唯一 alias。内部 API、数据库和 Redis 留在默认网络；不需要为 Printf 发布应用端口到宿主机。在控制面把 Target Service 设置为该 alias 和容器内部端口，例如 `http://my-app:8080`。
 
 没有 Docker，或需要 Windows/macOS 原生运行时，再下载 Native Client。Linux/macOS 安装对应的 WireGuard 工具后，以管理员权限运行：
 
@@ -94,19 +103,18 @@ Client is running
 
 | 模式 | 用途 | 支持 Docker alias |
 | --- | --- | --- |
-| Docker host-mode Client | Linux 宿主机上的本地服务 | 否 |
-| Docker Bridge Client | 同机 Node 或跨 Compose service alias | 是 |
+| Docker Compose Bridge Client | 有 Docker 的 Windows、Linux 或 macOS 主机 | 是 |
 | Native Client | 没有 Docker，或需要 Windows、macOS 原生运行 | 否 |
 
-本仓库根目录 Compose 提供 Docker host-mode。公开 GitHub Release 继续提供 Native Client 二进制。Native Client 的 direct Mapping 数据路径为：
+本仓库根目录 Compose 提供 Bridge Client，数据路径为：
 
 ```text
-Internet -> Public Node -> WireGuard -> Client printf0 IP:target_port
+Internet -> Public Node -> WireGuard -> Bridge Client relay -> Docker alias:target_port
 ```
 
-目标服务必须监听 `0.0.0.0:target_port` 或 Client 的 WireGuard 地址。只监听 `127.0.0.1` 的服务无法接收来自 WireGuard 的流量。
+应用入口必须在容器内监听 `0.0.0.0:target_port`。Client 与应用入口共享 external network，但应用不需要向宿主机或公网发布该端口。
 
-Native Client 不解析 Docker service alias，也不能设置 `PRINTF_BRIDGE_MODE=true`。
+公开 GitHub Release 继续提供 Native Client 二进制。Native Client 使用 direct Mapping，不解析 Docker service alias，也不能设置 `PRINTF_BRIDGE_MODE=true`。
 
 ## 文档
 

@@ -11,9 +11,9 @@
 - 控制面的 HTTPS 地址。
 - 一台不与公网 Printf Node 同机的 Windows、Linux 或 macOS 主机。
 - 管理员权限。
-- 目标服务监听在 `0.0.0.0:target_port` 或 WireGuard 地址。
+- 目标 HTTP 服务及其 Compose 入口服务和容器内部端口。
 
-Linux 主机已有 Docker 时优先使用 Compose。镜像已包含 WireGuard 和网络工具，宿主机不需要额外安装。Native Client 不需要 Docker，但需要操作系统对应的 WireGuard 工具。
+主机已有 Docker 时优先使用 Compose。镜像已包含 WireGuard 和网络工具，宿主机不需要额外安装。无 Docker 时使用 Native Client，并安装操作系统对应的 WireGuard 工具。
 
 ## 2. Docker Compose
 
@@ -29,19 +29,41 @@ chmod 0600 .env
 ```dotenv
 PRINTF_TOKEN=replace-with-client-token
 PRINTF_SERVER=https://moon.example.com
-PRINTF_IMAGE=lprintf/printf:v0.2
+PRINTF_BRIDGE_NETWORK=gateway
 ```
 
-启动并检查：
+创建共享 external network，启动通用 Client 并检查：
 
 ```bash
+docker network inspect gateway >/dev/null 2>&1 || docker network create gateway
 docker compose pull
 docker compose up -d
 docker compose ps
 docker compose logs --tail 100 printf-client
 ```
 
-需要 Alpine 变体时，把 `PRINTF_IMAGE` 改为 `lprintf/printf:alpine-v0.2`。两个镜像都已包含 Client 所需工具，不要在宿主机重复安装 `wireguard-tools`。
+Windows Docker Desktop 使用验证过的 Alpine 变体：
+
+```bash
+docker compose -f docker-compose.alpine.yml pull
+docker compose -f docker-compose.alpine.yml up -d
+docker compose -f docker-compose.alpine.yml ps
+```
+
+Linux 和 macOS Docker 默认使用通用 `docker-compose.yml`。两个镜像都已包含 Client 所需工具，不要在宿主机重复安装 `wireguard-tools`。
+
+参考仓库根目录的 `compose.service.yml` 修改应用现有 Compose：
+
+- 只把前端 Nginx、认证网关或单体应用等公网 HTTP 入口加入 `gateway`。
+- 为入口声明唯一的小写 DNS alias，例如 `my-app`。
+- 使用容器内部监听端口，不为 Printf 添加宿主机 `ports`。
+- 数据库、Redis 和内部 API 留在应用默认网络。
+
+应用有认证网关时发布认证网关，不直接发布被保护的后端。启动应用后，在控制面把 Target Service 设置为 alias 和容器内部端口，例如：
+
+```text
+http://my-app:8080
+```
 
 `.env` 和 `wg_data/` 已被 Git 忽略。不要提交 token、私钥或完整 WireGuard 配置。同一个 token 不应同时运行 Compose 与 Native Client。
 
@@ -214,7 +236,7 @@ sudo systemctl status printf-client --no-pager
 
 macOS 和 Windows 当前先以前台或管理员自行管理的服务方式运行。WireGuard tunnel service 不能替代 Printf Client 进程；Client 进程必须持续运行以发送 heartbeat 和接收配置更新。
 
-## 10. 创建 direct Mapping
+## 10. 创建 Native direct Mapping
 
 在控制面把 Target Service 设置为默认本地端口，例如：
 

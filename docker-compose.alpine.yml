@@ -1,6 +1,6 @@
 services:
   printf-client:
-    image: lprintf/printf:v0.2
+    image: lprintf/printf:alpine-v0.2
     privileged: true
     cap_add:
       - NET_ADMIN

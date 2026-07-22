@@ -107,17 +107,19 @@ $env:PRINTF_WIREGUARD_EXE = "C:\Program Files\WireGuard\wireguard.exe"
 
 ## 8. Client 在线但站点访问失败
 
-按路径检查：
+Bridge Compose 按路径检查：
 
 1. Client 最近是否 heartbeat。
-2. Node 与 Client 是否有 WireGuard handshake。
-3. Node 是否能访问 Client WireGuard IP。
-4. Node 是否能连接 `client_wg_ip:target_port`。
-5. 服务是否监听 `0.0.0.0:target_port`。
-6. Node Nginx 是否已同步对应 Mapping。
-7. 公网 DNS 和 HTTPS 是否指向正确 Node。
+2. Client capability 是否包含 `bridge_tcp_relay_v1`。
+3. Mapping 的 `target_host` 是否与 Compose alias 完全一致。
+4. Client 与应用入口是否加入同一个 external network。
+5. 应用是否在容器内监听 `0.0.0.0:target_port`。
+6. route 和 relay 状态是否报告 DNS、连接或超时错误。
+7. Node 与 Client 是否有 WireGuard handshake。
+8. Node Nginx 是否已同步对应 Mapping。
+9. 公网 DNS 和 HTTPS 是否指向正确 Node。
 
-Linux 查看监听：
+Native direct 模式再检查 Node 是否能连接 `client_wg_ip:target_port`，以及宿主机监听地址。Linux 查看监听：
 
 ```bash
 sudo ss -lntp
@@ -136,7 +138,7 @@ sudo ss -lntp
 Client 每 30 秒 heartbeat。控制面通过 `config_version` 和 `route_version` 通知变更：
 
 - WireGuard/Node 配置变化：Client 重新 join。
-- Bridge route 变化：Bridge Client重新拉取 `/routes`。
+- Bridge route 变化：Bridge Client 重新拉取 `/routes`。
 - direct Mapping 的 Nginx upstream 主要由控制面同步 Node。
 
 检查控制面 Node sync 是否成功，不要只重启 Client。

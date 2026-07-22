@@ -12,6 +12,14 @@ Printf Client 通过环境变量配置。未知或非法值会显式报错，不
 
 Client 会删除 `PRINTF_SERVER` 末尾多余的 `/`。
 
+## Compose 变量
+
+| 变量 | 示例 | 说明 |
+| --- | --- | --- |
+| `PRINTF_BRIDGE_NETWORK` | `gateway` | Client 与应用 HTTP 入口共享的预先创建 external network。 |
+
+容器默认使用 `PRINTF_RUNTIME_MODE=docker`，根目录 Compose 显式设置 `PRINTF_BRIDGE_MODE=true`，不需要在 `.env` 重复设置。应用 Mapping 使用入口的 Docker alias 和容器内部端口，不使用宿主机端口。
+
 ## WireGuard 变量
 
 | 变量 | Native 默认值 | 说明 |
@@ -51,7 +59,7 @@ printf0.conf
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `PRINTF_BRIDGE_MODE` | `false` | 是否注册 `bridge_tcp_relay_v1`。Native 模式禁止启用。 |
+| `PRINTF_BRIDGE_MODE` | `false` | 是否注册 `bridge_tcp_relay_v1`。根目录 Compose 显式启用；Native 模式禁止启用。 |
 | `PRINTF_DNS_CACHE_TTL_SECONDS` | `10` | Docker alias DNS 缓存时间。 |
 | `PRINTF_RELAY_CONNECT_TIMEOUT_SECONDS` | `5` | relay 连接目标超时。 |
 | `PRINTF_RELAY_IDLE_TIMEOUT_SECONDS` | `300` | relay 空闲连接超时。 |
