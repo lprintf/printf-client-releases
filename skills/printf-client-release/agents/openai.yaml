@@ -1,0 +1,4 @@
+interface:
+  display_name: "Publish with Printf"
+  short_description: "Publish a Compose service through Printf HTTPS"
+  default_prompt: "Use $printf-client-release to publish my Docker Compose HTTP service over public HTTPS."

@@ -1,0 +1,20 @@
+name: ${COMPOSE_PROJECT_NAME:-my-app}
+
+services:
+  app:
+    build: .
+    expose:
+      - "${PRINTF_TARGET_PORT:?set PRINTF_TARGET_PORT to the container port}"
+    restart: unless-stopped
+    networks:
+      default:
+      gateway:
+        aliases:
+          - ${PRINTF_TARGET_HOST:?set PRINTF_TARGET_HOST to a unique DNS label}
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-my-app}
+  gateway:
+    external: true
+    name: ${PRINTF_BRIDGE_NETWORK:?set PRINTF_BRIDGE_NETWORK to the Client network}

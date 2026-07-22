@@ -1,0 +1,20 @@
+services:
+  printf-client:
+    image: lprintf/printf:v0.2
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    environment:
+      PRINTF_TOKEN: ${PRINTF_TOKEN:?set PRINTF_TOKEN in .env}
+      PRINTF_SERVER: ${PRINTF_SERVER:-https://moon.lprintf.com}
+      PRINTF_BRIDGE_MODE: "true"
+    volumes:
+      - ./wg_data:/etc/wireguard
+    networks:
+      - gateway
+    restart: unless-stopped
+
+networks:
+  gateway:
+    external: true
+    name: ${PRINTF_BRIDGE_NETWORK:?set PRINTF_BRIDGE_NETWORK in .env}

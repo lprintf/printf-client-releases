@@ -4,6 +4,22 @@
 
 当前阶段不包含 Client 源码。控制面、Admin API、Node SSH 部署逻辑和生产环境配置也不在本仓库公开范围内。
 
+## 使用 AI Agent 发布（推荐）
+
+> 已取得 Printf Client token 且本机已有 Docker 时，推荐直接让能读取本地文件并执行命令的 AI Agent 完成 Compose 接入、Client 启动、API Mapping 和公网 HTTPS 验证。宿主机不需要另外安装 WireGuard 工具。
+
+先把 token 写入 skill 目录中已被 Git 忽略的本地环境文件，不要把真实 token 放进提示词、Git 提交或 Issue：
+
+```bash
+cp skills/printf-client-release/.env.example skills/printf-client-release/.env
+```
+
+然后把下面这句话直接交给 Agent：
+
+> 请读取当前仓库的 `AGENT-PUBLISH.md`，并严格按照它索引的 `$printf-client-release` skill，把我当前工作区中的 Docker Compose HTTP 服务发布为 Printf 公网 HTTPS 地址。不要输出 token，不要安装宿主机 WireGuard 工具，不要为 Printf 暴露应用宿主机端口。
+
+完整入口见 [AGENT-PUBLISH.md](AGENT-PUBLISH.md)。可独立安装或提供给 Agent 的 skill 位于 [`skills/printf-client-release/`](skills/printf-client-release/SKILL.md)。
+
 ## Native 二进制下载
 
 从 [Latest Release](https://github.com/lprintf/printf-client-releases/releases/latest) 下载对应平台的压缩包：
@@ -120,6 +136,7 @@ Internet -> Public Node -> WireGuard -> Bridge Client relay -> Docker alias:targ
 
 | 文档 | 用途 |
 | --- | --- |
+| [AI Agent 发布入口](AGENT-PUBLISH.md) | 可直接交给 Agent 的提示词和 skill 文件索引。 |
 | [开始使用](docs/getting-started.md) | 从 token、Compose 或 Native 到首次运行。 |
 | [配置参考](docs/configuration.md) | 环境变量、数据目录和接口名。 |
 | [平台安装](docs/platforms.md) | Linux、macOS、Windows 安装方法。 |
