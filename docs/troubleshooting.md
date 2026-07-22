@@ -1,41 +1,35 @@
 # 故障排查
 
-按以下顺序检查，不要一开始就删除私钥或重建 Client。
+按以下顺序检查，不要一开始就删除私钥、数据目录或重建 Client。
 
 ## 1. Client 是否启动
 
-Linux：
+Docker Compose：
+
+```bash
+docker compose ps
+docker compose logs --tail 100 printf-client
+```
+
+Native Linux：
 
 ```bash
 sudo systemctl status printf-client --no-pager
 sudo journalctl -u printf-client -n 100 --no-pager
 ```
 
-前台运行时检查是否出现：
-
-```text
-WireGuard tunnel established.
-Client is running
-```
+日志出现 `Client is running` 表示 Client 已进入运行状态。容器反复重启时保留最早的明确错误，不要只看最后一行。
 
 ## 2. `PRINTF_TOKEN not set`
 
-原因：进程没有收到环境变量。
-
-systemd 环境文件应是：
+进程没有收到 token。Compose 用户检查当前目录的 `.env`；systemd 环境文件应为：
 
 ```dotenv
 PRINTF_TOKEN=replace-with-client-token
 PRINTF_SERVER=https://moon.example.com
 ```
 
-不要写：
-
-```bash
-export PRINTF_TOKEN=...
-```
-
-修改后：
+systemd 环境文件不要写 `export`。修改后执行：
 
 ```bash
 sudo systemctl restart printf-client
@@ -43,120 +37,91 @@ sudo systemctl restart printf-client
 
 ## 3. `Invalid token`
 
-可能原因：
+检查：
 
-- token 复制错误。
-- token 已在控制面刷新。
-- Client 指向了错误的控制面。
-- 环境文件包含多余引号或不可见字符。
+- token 是否复制完整。
+- token 是否已在控制面刷新。
+- `PRINTF_SERVER` 是否指向正确控制面。
+- 环境文件是否包含多余引号或不可见字符。
 
-不要把 token 发到 Issue。可以在控制面重新生成并替换本机配置。
+不要把 token 发到 Issue 或聊天记录。无法确认时，在控制面刷新 token 并替换本地配置。
 
 ## 4. `Token already in use by an active client`
 
-同一个 token 正被另一组 WireGuard 公钥使用。
+同一个 token 已有其他 Client 在线。检查是否同时运行了 Docker、Native、旧主机或重复容器。
 
-检查：
+停止旧实例并等待控制面显示离线后再启动。不要删除 `wg_data/` 或 Native 数据目录重试。
 
-- 是否同时运行 Docker 和 Native Client。
-- 旧主机是否仍在线。
-- systemd 是否启动了多个 unit。
-- Windows 是否还有另一份 Client 进程。
+## 5. 没有可用服务节点
 
-停止旧实例，等待其离线或刷新 token 后再启动。
+token 有效，但当前 Client 没有可用的公网服务路径。检查：
 
-## 5. `Control plane returned no active nodes`
+- Client 是否已经绑定域名。
+- 域名服务状态是否正常。
+- 控制面是否有明确的维护或配置错误。
 
-token 有效，但 Client 当前没有可用 Node。检查控制面：
+本地重复重启通常不能解决服务端状态问题。保留错误文本并联系管理员。
 
-- Client 是否绑定域名。
-- 域名是否绑定 active Node。
-- Node 是否标记 offline。
-- Node WireGuard 是否已部署。
+## 6. Client 在线但站点无法访问
 
-## 6. `wg-quick` 找不到
+Docker Compose 按顺序检查：
 
-Linux：
+1. Mapping 的 Target Service 是否使用正确 alias 和容器内部端口。
+2. Client 和应用入口是否加入同一个 external network。
+3. 应用入口是否在容器内监听 `0.0.0.0:target_port`。
+4. 应用容器和健康检查是否正常。
+5. Mapping 状态是否报告目标离线。
+6. 公网 HTTPS 地址是否使用控制面返回的最终域名。
 
-```bash
-command -v wg-quick
-```
-
-macOS Apple Silicon：
+查看共享网络：
 
 ```bash
-ls -l /opt/homebrew/bin/wg-quick
+docker network inspect gateway
 ```
 
-显式设置 `PRINTF_WG_QUICK`。
-
-## 7. Windows WireGuard 安装失败
-
-确认：
-
-- 已安装 WireGuard for Windows。
-- PowerShell 以管理员身份运行。
-- `wireguard.exe` 路径正确。
-- `printf0` tunnel service 没有被其他管理程序锁定。
-
-必要时设置：
-
-```powershell
-$env:PRINTF_WIREGUARD_EXE = "C:\Program Files\WireGuard\wireguard.exe"
-```
-
-## 8. Client 在线但站点访问失败
-
-Bridge Compose 按路径检查：
-
-1. Client 最近是否 heartbeat。
-2. Client capability 是否包含 `bridge_tcp_relay_v1`。
-3. Mapping 的 `target_host` 是否与 Compose alias 完全一致。
-4. Client 与应用入口是否加入同一个 external network。
-5. 应用是否在容器内监听 `0.0.0.0:target_port`。
-6. route 和 relay 状态是否报告 DNS、连接或超时错误。
-7. Node 与 Client 是否有 WireGuard handshake。
-8. Node Nginx 是否已同步对应 Mapping。
-9. 公网 DNS 和 HTTPS 是否指向正确 Node。
-
-Native direct 模式再检查 Node 是否能连接 `client_wg_ip:target_port`，以及宿主机监听地址。Linux 查看监听：
+Native 模式还需确认目标服务没有只监听 `127.0.0.1`。Linux 查看监听：
 
 ```bash
 sudo ss -lntp
 ```
 
-如果只看到：
+## 7. 修改 Mapping 后未生效
 
-```text
-127.0.0.1:8080
+1. 重新读取控制面的 Mapping，确认 alias、端口和启用状态已保存。
+2. 等待最多 60 秒，再检查 Mapping 状态。
+3. 查看 Client 日志是否有新的明确错误。
+4. 直接请求最终公网 HTTPS 地址，不自行拼接域名。
+
+仍未生效时保留 Mapping 状态和脱敏日志，不要通过反复开关或删除 Mapping 掩盖问题。
+
+## 8. Native 平台依赖错误
+
+当前 Native Linux/macOS 版本找不到 `wg-quick` 时，先按 [平台安装](platforms.md) 安装依赖，再确认路径：
+
+```bash
+command -v wg-quick
 ```
 
-应修改应用监听地址。
+Windows 当前 Native 版本需要 WireGuard for Windows，并要求管理员权限。自定义安装路径时设置：
 
-## 9. 修改 Mapping 后未生效
+```powershell
+$env:PRINTF_WIREGUARD_EXE = "D:\Tools\WireGuard\wireguard.exe"
+```
 
-Client 每 30 秒 heartbeat。控制面通过 `config_version` 和 `route_version` 通知变更：
+Docker 用户不需要在宿主机安装这些 Native 依赖。
 
-- WireGuard/Node 配置变化：Client 重新 join。
-- Bridge route 变化：Bridge Client 重新拉取 `/routes`。
-- direct Mapping 的 Nginx upstream 主要由控制面同步 Node。
+## 9. 收集脱敏信息
 
-检查控制面 Node sync 是否成功，不要只重启 Client。
+Issue 可以包含：
 
-## 10. 收集脱敏信息
-
-Issue 可包含：
-
-- Client 版本。
+- Client 版本和使用的 Compose 文件。
 - 操作系统和架构。
-- runtime mode。
-- 错误文本。
-- 是否能访问控制面 HTTPS。
-- 是否有 WireGuard handshake。
+- Docker 或 Native 运行方式。
+- 完整错误文本。
+- Client、Mapping 和目标服务是否在线。
 
 必须删除：
 
-- token。
-- private key。
-- 完整 WireGuard config。
-- 生产域名和不希望公开的 IP。
+- token 和认证 header。
+- private key 和完整传输配置。
+- 生产域名、内网地址和不希望公开的日志内容。

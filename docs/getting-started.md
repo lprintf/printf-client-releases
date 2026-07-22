@@ -9,11 +9,11 @@
 - 一个由 Printf 控制面创建的 Client。
 - 该 Client 的 token。
 - 控制面的 HTTPS 地址。
-- 一台不与公网 Printf Node 同机的 Windows、Linux 或 macOS 主机。
+- 一台 Windows、Linux 或 macOS 主机。
 - 管理员权限。
 - 目标 HTTP 服务及其 Compose 入口服务和容器内部端口。
 
-主机已有 Docker 时优先使用 Compose。镜像已包含 WireGuard 和网络工具，宿主机不需要额外安装。无 Docker 时使用 Native Client，并安装操作系统对应的 WireGuard 工具。
+主机已有 Docker 时优先使用 Compose。镜像已包含 Client 运行所需组件，宿主机不需要额外安装网络辅助工具。无 Docker 时使用 Native Client，并按本文安装当前平台依赖。
 
 ## 2. Docker Compose
 
@@ -50,7 +50,7 @@ docker compose -f docker-compose.alpine.yml up -d
 docker compose -f docker-compose.alpine.yml ps
 ```
 
-Linux 和 macOS Docker 默认使用通用 `docker-compose.yml`。两个镜像都已包含 Client 所需工具，不要在宿主机重复安装 `wireguard-tools`。
+Linux 和 macOS Docker 默认使用通用 `docker-compose.yml`。两个镜像都已包含 Client 所需组件，不要在宿主机重复安装 Native 平台依赖。
 
 参考仓库根目录的 `compose.service.yml` 修改应用现有 Compose：
 
@@ -65,7 +65,7 @@ Linux 和 macOS Docker 默认使用通用 `docker-compose.yml`。两个镜像都
 http://my-app:8080
 ```
 
-`.env` 和 `wg_data/` 已被 Git 忽略。不要提交 token、私钥或完整 WireGuard 配置。同一个 token 不应同时运行 Compose 与 Native Client。
+`.env` 和 `wg_data/` 已被 Git 忽略。不要提交 token、私钥或完整传输配置。同一个 token 不应同时运行 Compose 与 Native Client。
 
 以下步骤只适用于没有 Docker 或需要原生运行的主机。
 
@@ -87,7 +87,7 @@ $env:PRINTF_TOKEN = "replace-with-client-token"
 $env:PRINTF_SERVER = "https://moon.example.com"
 ```
 
-同一个 token 不应同时运行两个 Client。控制面会拒绝在线 Client 使用同一 token 注册不同 WireGuard 公钥。
+同一个 token 不应同时运行两个 Client。发现已有在线实例时，Client 会明确报错并停止。
 
 ## 4. Native 选择下载包
 
@@ -196,18 +196,13 @@ $env:PRINTF_RUNTIME_MODE = "native"
 
 ## 8. 预期日志
 
-首次启动会生成 WireGuard key：
+启动成功时日志包含：
 
 ```text
-Generating new WireGuard keys...
-Registering with Printf Control Panel
-Success! Subscribed to 1 nodes.
-Restarting WireGuard interface printf0 (native)...
-WireGuard tunnel established.
 Client is running
 ```
 
-如果响应没有 active Node，Client 会明确退出，不会伪装在线。
+没有可用公网服务路径时，Client 会明确退出，不会伪装在线。
 
 ## 9. Native 后台运行
 
@@ -234,9 +229,9 @@ sudo systemctl enable --now printf-client
 sudo systemctl status printf-client --no-pager
 ```
 
-macOS 和 Windows 当前先以前台或管理员自行管理的服务方式运行。WireGuard tunnel service 不能替代 Printf Client 进程；Client 进程必须持续运行以发送 heartbeat 和接收配置更新。
+macOS 和 Windows 当前先以前台或管理员自行管理的服务方式运行。Printf Client 进程必须持续运行以维护连接和在线状态。
 
-## 10. 创建 Native direct Mapping
+## 10. 创建 Native 本地 Mapping
 
 在控制面把 Target Service 设置为默认本地端口，例如：
 
@@ -250,13 +245,13 @@ http://[默认本地]:8080
 0.0.0.0:8080
 ```
 
-或 Client 的 WireGuard IP。只监听：
+或平台允许的 Client 地址。只监听：
 
 ```text
 127.0.0.1:8080
 ```
 
-无法接收 Node 通过 WireGuard 发来的流量。
+无法接收 Printf 加密传输通道发来的流量。
 
 ## 11. 验证
 
@@ -283,4 +278,4 @@ sudo wg show
 
 Windows：在 WireGuard UI 或管理员 PowerShell 中检查 `printf0` tunnel service。
 
-最后请求 Mapping 的公网 HTTPS 地址。出现问题时按 [故障排查](troubleshooting.md) 从 Client、WireGuard、Node 到目标服务依次检查。
+最后请求 Mapping 的公网 HTTPS 地址。出现问题时按 [故障排查](troubleshooting.md) 从 Client、Mapping 到目标服务依次检查。

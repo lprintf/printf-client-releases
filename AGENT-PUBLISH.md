@@ -8,7 +8,7 @@
 
 执行时遵守以下边界：
 
-- 优先使用 Docker Compose Bridge，不在宿主机安装 `wg`、`wg-quick` 或其他 Client 辅助工具。
+- 优先使用 Docker Compose Bridge，不在宿主机安装额外的网络辅助工具。
 - 从目标项目现有 Compose、Dockerfile、网关和健康检查中确认真正的 HTTP 入口及容器内部端口，不使用 `.env.example` 中的示例 alias 或端口冒充真实配置。
 - 只把认证网关、前端 Nginx 或单体应用入口加入共享 external network；数据库、Redis 和内部 API 保持私有。
 - 使用 Docker alias 作为 Client API 的 `target_host`，使用容器内部端口作为 `target_port`，不为 Printf 添加宿主机 `ports`。

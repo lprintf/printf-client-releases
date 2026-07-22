@@ -116,14 +116,7 @@ $env:PRINTF_SERVER = "https://moon.example.com"
 $env:PRINTF_WIREGUARD_EXE = "D:\Tools\WireGuard\wireguard.exe"
 ```
 
-Client 会执行：
-
-```text
-wireguard.exe /uninstalltunnelservice printf0
-wireguard.exe /installtunnelservice <config-path>
-```
-
-卸载动作允许 tunnel service 尚不存在；安装失败会显式退出。
+Client 会管理当前版本所需的本地 tunnel service；安装或启动失败时会显式退出。
 
 当前 Windows 二进制未做 Authenticode 签名，SmartScreen 可能显示未知发布者。只从官方 Release 下载并先验证 SHA-256。
 
@@ -131,10 +124,7 @@ wireguard.exe /installtunnelservice <config-path>
 
 Client 需要管理员权限是因为它必须：
 
-- 创建 WireGuard interface/tunnel service；
-- 分配 Client WireGuard IP；
-- 安装 WireGuard peer 配置；
-- 修改系统路由；
-- 保存受保护的私钥。
+- 管理当前版本的加密传输和本地路由；
+- 保存受保护的 Client 私钥与运行配置。
 
 Client 不需要 Docker socket，也不通过服务端执行任意本地 shell 命令。
