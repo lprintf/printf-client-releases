@@ -1,6 +1,6 @@
 ---
 name: printf-client-release
-description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Compose HTTP 服务发布为公网 HTTPS 地址。用于用户要求部署、公开、映射、上线或检查 Web 服务，并已提供 Printf token、控制面地址或期望域名的场景。
+description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Compose HTTP 服务发布为公网 HTTPS 地址。用于用户要求部署、公开、映射、上线或检查 Web 服务的场景，也适用于尚未配置 Printf token、需要先引导获取凭据的情况。
 ---
 
 # 使用 Printf 发布 Compose 服务
@@ -33,7 +33,45 @@ description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Co
 
 ## 工作流
 
-### 1. 调整应用 Compose
+### 1. 检查环境和 Token
+
+在修改项目或启动服务前，先确认目标工作区存在 Compose 服务，并检查 `docker`、`docker compose`、`curl` 和 `jq`。缺少工具时报告具体缺项并停止。
+
+关闭 shell trace，检查进程环境和本 skill 目录的 `.env`。进程环境中的 `PRINTF_TOKEN` 优先于 `.env`：
+
+```bash
+set +x
+case "${PRINTF_TOKEN-}" in
+  ""|replace-with-client-token|replace_with_your_token)
+    printf_token_from_process=""
+    ;;
+  *)
+    printf_token_from_process="${PRINTF_TOKEN}"
+    ;;
+esac
+if [ -f ./.env ]; then
+  set -a
+  . ./.env
+  set +a
+fi
+if [ -n "${printf_token_from_process}" ]; then
+  PRINTF_TOKEN="${printf_token_from_process}"
+fi
+unset printf_token_from_process
+```
+
+空值、`replace-with-client-token` 和 `replace_with_your_token` 都表示未配置。缺少有效 `PRINTF_TOKEN` 时立即停止，读取 `references/get-token.md`，把其中的获取方式告诉用户，并提示用户取得后写入本地进程环境或本 skill 目录的 `.env`。不要猜测 Token，不要要求用户在聊天中发送 Token，也不要继续修改项目、启动 Client 或调用 Mapping API。
+
+Token 有效时再设置其余默认值：
+
+```bash
+PRINTF_SERVER="${PRINTF_SERVER:-https://moon.lprintf.com}"
+PRINTF_SERVER="${PRINTF_SERVER%/}"
+PRINTF_BRIDGE_NETWORK="${PRINTF_BRIDGE_NETWORK:-gateway}"
+PRINTF_CLIENT_COMPOSE="${PRINTF_CLIENT_COMPOSE:-./docker-compose.yml}"
+```
+
+### 2. 调整应用 Compose
 
 读取用户项目的 Compose、Dockerfile、反向代理和健康检查配置，确定唯一的公网 HTTP 入口及其容器内部端口。参考 `compose.service.yml` 修改现有 Compose：
 
@@ -46,31 +84,24 @@ description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Co
 
 `compose.service.yml` 是结构参考，不覆盖用户现有服务定义。项目没有 Compose 时才以它为起点，并替换示例中的 service、build、端口和 alias。
 
-### 2. 准备 Compose 和 Client 凭据
+### 3. 准备 Compose 和 Client 配置
 
-确认 `docker`、`docker compose`、`curl` 和 `jq` 可用。在本 skill 目录复制 `.env.example` 为 `.env`，写入真实值；`.env` 已被忽略，提交前仍要确认没有进入 Git。
+需要持久化配置且本 skill 目录没有 `.env` 时，才复制 `.env.example`；不要覆盖已有 `.env`。写入真实 Token 和已从目标项目核实的 alias、容器内部端口；`.env` 已被忽略，提交前仍要确认没有进入 Git。Token 也可以只保留在当前进程环境中。
 
 默认设置 `PRINTF_CLIENT_COMPOSE=./docker-compose.yml`，使用 `lprintf/printf:v0.2`。只有用户明确在 Windows Docker Desktop 环境使用验证过的 Alpine 变体时，才改为 `PRINTF_CLIENT_COMPOSE=./docker-compose.alpine.yml`，使用 `lprintf/printf:alpine-v0.2`。不要根据 shell 名称猜测平台。
 
-关闭 shell trace 并加载环境：
+确认当前 shell 中的目标配置不是示例值：
 
 ```bash
 set +x
-set -a
-. ./.env
-set +a
 : "${PRINTF_TOKEN:?PRINTF_TOKEN is required}"
 : "${PRINTF_TARGET_HOST:?PRINTF_TARGET_HOST is required}"
 : "${PRINTF_TARGET_PORT:?PRINTF_TARGET_PORT is required}"
-PRINTF_SERVER="${PRINTF_SERVER:-https://moon.lprintf.com}"
-PRINTF_SERVER="${PRINTF_SERVER%/}"
-PRINTF_BRIDGE_NETWORK="${PRINTF_BRIDGE_NETWORK:-gateway}"
-PRINTF_CLIENT_COMPOSE="${PRINTF_CLIENT_COMPOSE:-./docker-compose.yml}"
 ```
 
 确认 `PRINTF_TARGET_HOST` 与应用 Compose 的 alias 完全一致。不要运行会输出完整环境的 `docker compose config`；Client Compose 只用 `docker compose ... config --quiet` 校验。
 
-### 3. 启动应用
+### 4. 启动应用
 
 返回应用 Compose 所在目录，创建共享网络并启动应用。网络已存在时复用：
 
@@ -86,7 +117,7 @@ docker compose ps
 
 连接失败、容器不健康或入口进程未监听目标端口时停止并修复应用，不继续创建公网映射。完成后返回本 skill 目录执行 Client 命令。
 
-### 4. 验证 token 和 Client 归属
+### 5. 验证 token 和 Client 归属
 
 ```bash
 config_json="$(curl --fail-with-body --silent --show-error \
@@ -103,7 +134,7 @@ config_json="$(curl --fail-with-body --silent --show-error \
 
 不重试或重建 `wg_data/` 来掩盖 token 冲突。
 
-### 5. 启动 Bridge Client
+### 6. 启动 Bridge Client
 
 ```bash
 docker compose -f "${PRINTF_CLIENT_COMPOSE}" config --quiet
@@ -120,7 +151,7 @@ docker compose -f "${PRINTF_CLIENT_COMPOSE}" logs --tail 100 printf-client
 
 报告原始错误并停止，不继续创建映射。
 
-### 6. 选择域名
+### 7. 选择域名
 
 ```bash
 domains_json="$(curl --fail-with-body --silent --show-error \
@@ -130,7 +161,7 @@ domains_json="$(curl --fail-with-body --silent --show-error \
 
 按 `domain_name` 精确匹配并使用对应整数 `id`。返回空数组时停止，提示用户先在控制面为 Client 绑定域名。不要依赖 `Host` header 推断域名。
 
-### 7. 幂等写入 Bridge 映射
+### 8. 幂等写入 Bridge 映射
 
 重新读取 `/api/client/config`，按以下键查找：
 
@@ -175,7 +206,7 @@ curl --fail-with-body --silent --show-error \
 
 `POST` 和 `PUT` 只返回操作状态。成功后必须再次读取 `/api/client/config`，用相同键取得 `id`、`target_host`、`target_port`、`is_active` 和 `full_subdomain`。字段与请求不一致或 `full_subdomain` 为空时视为失败。
 
-### 8. 验证公网链路
+### 9. 验证公网链路
 
 1. 调用 `GET /api/client/mappings/{id}/stats`，检查 `client_online`、`best.wg_healthy`、`best.target_offline`、`best.http_status` 和 `best.relay_status`。
 2. 请求 `https://{full_subdomain}` 的已知健康检查路径，限制连接和总超时，并保留实际 HTTP 状态。
