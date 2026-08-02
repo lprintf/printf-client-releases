@@ -7,7 +7,7 @@
 无需 clone 本仓库。直接把下面整段复制给能访问 GitHub、读取本地项目并执行命令的 AI Agent：
 
 ```text
-请读取 https://github.com/lprintf/printf-client-releases/blob/main/AGENT-PUBLISH.md，使用其中的 `$printf-client-release` skill，把我当前工作区中的 Docker Compose HTTP 服务发布为 Printf 公网 HTTPS 地址。如果本地没有该 Skill，按照文档从官方 Raw URL 获取最小文件集，不要 clone 整个 release 仓库。先检查运行环境和配置；缺少 `PRINTF_TOKEN` 时停止，并告诉我按照 https://github.com/lprintf/printf-client-releases/blob/main/GET-TOKEN.md 获取内测 Token，不要猜测 Token，也不要要求我在聊天中公开 Token。不要安装额外的宿主机网络工具，不要为 Printf 暴露应用宿主机端口。
+请读取 https://github.com/lprintf/printf-client-releases/blob/main/AGENT-PUBLISH.md，使用其中的 `$printf-client-release` skill，把我当前工作区中的 HTTP 服务发布为 Printf 公网 HTTPS 地址。如果本地没有该 Skill，按照文档从官方 Raw URL 获取最小文件集，不要 clone 整个 release 仓库。先检查运行环境和配置；Docker 可用时使用 Compose Bridge，Docker 命令不存在且应用能脱离 Docker 运行时使用校验过的 Native Client，纯 Compose 应用没有 Docker 时停止。缺少 `PRINTF_TOKEN` 时停止，并告诉我按照 https://github.com/lprintf/printf-client-releases/blob/main/GET-TOKEN.md 获取内测 Token，不要猜测 Token，也不要要求我在聊天中公开 Token。不要安装额外的宿主机网络工具，不要为 Printf 暴露应用宿主机端口。只有确认是 Native 发布包缺陷时才生成脱敏 Issue 草稿，搜索重复 Issue，并在我确认公开内容后提交；安全问题改用私密漏洞报告。
 ```
 
 无需提前准备 Token。Agent 会自行取得所需公开文件；如果发现缺少 Token，会告诉你如何获取和配置。取得方式也可直接查看 [GET-TOKEN.md](GET-TOKEN.md)。
@@ -49,7 +49,7 @@ docker compose -f docker-compose.alpine.yml up -d
 | macOS Apple Silicon | `printf-client-macos-arm64.tar.gz` |
 | Windows amd64 | `printf-client-windows-amd64.zip` |
 
-每个包都提供同名 `.sha256` 校验文件。Native Release 与 Docker 镜像使用独立版本线；当前 Native 版本是 `v0.0.2`，Docker 镜像版本是 `v0.2`。安装要求见 [平台安装](docs/platforms.md)。
+每个包都提供同名 `.sha256` 校验文件。Native Release 与 Docker 镜像使用独立版本线；当前 Native 版本是 `v0.0.2`，Docker 镜像版本是 `v0.2`。Agent 发现 Docker 命令不存在且应用能原生运行时会自动选择 Native；安装要求见 [平台安装](docs/platforms.md)。
 
 ## 更多文档
 

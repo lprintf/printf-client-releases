@@ -1,19 +1,20 @@
 ---
 name: printf-client-release
-description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Compose HTTP 服务发布为公网 HTTPS 地址。用于用户要求部署、公开、映射、上线或检查 Web 服务的场景，也适用于尚未配置 Printf token、需要先引导获取凭据的情况。
+description: 通过 Docker Compose Bridge 或 Native Client 和 Client API，把现有 HTTP 服务发布为公网 HTTPS 地址。用于用户要求部署、公开、映射、上线或检查 Web 服务，Docker 可能不可用、尚未配置 Printf token，或 Native 二进制疑似故障需要生成脱敏 Issue 的场景。
 ---
 
-# 使用 Printf 发布 Compose 服务
+# 使用 Printf 发布 HTTP 服务
 
 ## 边界
 
-- 有 Docker 时使用 Compose Bridge 模式。镜像已包含 WireGuard 和网络工具，不在宿主机额外安装 `wg`、`wg-quick` 或其他 Client 辅助工具。
-- 先读取本目录的 `compose.service.yml` 和 `docker-compose.yml`。前者是应用侧入口服务参考，后者是通用 Client；Windows Docker Desktop 使用 `docker-compose.alpine.yml`。
-- 只把应用的公网 HTTP 入口服务加入 Client 所在的 external network。数据库、Redis、内部 API 等服务留在项目默认网络。
-- 使用唯一且稳定的 Docker alias 作为 API 的 `target_host`，使用容器内部监听端口作为 `target_port`。不为 Printf 向宿主机发布应用端口。
-- 应用已有认证网关时发布认证网关；否则发布前端 Nginx 或单体应用入口。不绕过现有认证层。
-- 一个 token 只运行一个 Client。控制面显示在线但当前 Compose 没有对应 Client 时停止，不启动第二个实例。
+- Docker 和 Compose 正常可用时必须使用 Compose Bridge。镜像已包含运行组件，不在宿主机额外安装 Client 网络辅助工具。
+- Docker 命令不存在时，只有目标 HTTP 服务已经在宿主机运行或能脱离 Docker 原生启动，才使用 Native Client，并完整读取 `references/native.md`。Native Client 不能替代 Docker 启动纯 Compose 应用。
+- Compose Bridge 先读取本目录的 `compose.service.yml` 和 `docker-compose.yml`。Windows Docker Desktop 使用 `docker-compose.alpine.yml`。
+- Compose Bridge 只把公网 HTTP 入口加入 external network，并使用唯一 Docker alias 和容器内部端口。Native Mapping 必须使用默认本地目标和宿主机服务端口。
+- 应用已有认证网关时发布认证网关，不绕过现有认证层。数据库、Redis 和内部 API 保持私有。
+- 一个 token 只运行一个 Client。控制面显示在线但本机没有对应 Client 时停止，不启动第二个实例。
 - 不调用 Admin API，不刷新 token，不删除映射。删除或替换用户资源前另行确认。
+- 怀疑 Native 发布包有缺陷时完整读取 `references/report-issue.md`。普通发布授权不等于公开发 Issue 的授权；提交前必须完成脱敏并取得用户确认，安全问题只使用私密漏洞报告。
 
 ## 输入
 
@@ -23,9 +24,10 @@ description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Co
 | --- | --- |
 | `PRINTF_TOKEN` | 必填 secret，禁止提交、回显或写入命令输出。 |
 | `PRINTF_SERVER` | 控制面 origin，默认 `https://moon.lprintf.com`，末尾不要带 `/`。 |
-| `PRINTF_BRIDGE_NETWORK` | Client 和应用入口共享的 external network，默认 `gateway`。 |
-| `PRINTF_TARGET_HOST` | 应用入口的 Docker alias，只能是小写 `a-z0-9-`，不能以 `-` 开头或结尾，最长 63 字符，且不能是 `localhost` 或 `host-docker-internal`。 |
-| `PRINTF_TARGET_PORT` | 应用入口容器内的 HTTP 监听端口，范围 `1..65535`。 |
+| 运行方式 | Docker 可用时为 Compose Bridge；Docker 不存在且满足 Native 条件时为 Native。 |
+| `PRINTF_BRIDGE_NETWORK` | 仅 Compose 使用，Client 和应用入口共享的 external network，默认 `gateway`。 |
+| `PRINTF_TARGET_HOST` | 仅 Compose 使用的 Docker alias；Native 必须省略或设为 `null`。 |
+| `PRINTF_TARGET_PORT` | Compose 为入口容器内部端口；Native 为宿主机服务端口，范围 `1..65535`。 |
 | 发布方式 | 默认站点，或带非空短名称的项目站点。 |
 | 基础域名 | 从 `/api/client/domains` 返回值选择。只有一个时可直接使用；多个且用户未指定时必须询问。 |
 
@@ -35,7 +37,13 @@ description: 通过 Docker Compose、Printf Client 和 Client API，把现有 Co
 
 ### 1. 检查环境和 Token
 
-在修改项目或启动服务前，先确认目标工作区存在 Compose 服务，并检查 `docker`、`docker compose`、`curl` 和 `jq`。缺少工具时报告具体缺项并停止。
+在修改项目或启动服务前，先读取目标项目的启动方式，并检查 HTTPS 客户端和结构化 JSON 工具。下面示例使用 `curl` 与 `jq`；Windows 没有 `jq` 时可使用 PowerShell `ConvertFrom-Json`、`ConvertTo-Json`，不要为此做字符串拼接或启发式解析。再按以下规则选择且只选择一种运行方式：
+
+- `docker`、`docker compose` 和 Docker daemon 都正常：选择 Compose Bridge。
+- Docker 命令不存在：确认应用是否已经原生运行或有可执行的原生启动方式。满足时选择 Native；只有 Compose 定义时停止并说明仍需 Docker。
+- Docker 已安装但 daemon 或 Compose 异常：报告原始错误并停止。除非用户明确选择 Native 且应用满足 Native 条件，不静默绕过损坏的 Docker 环境。
+
+不要为了执行 Printf Client 自动安装 Docker。记录选择结果，后续禁止混用 Compose alias 与 Native 默认本地目标。
 
 关闭 shell trace，检查进程环境和本 skill 目录的 `.env`。进程环境中的 `PRINTF_TOKEN` 优先于 `.env`：
 
@@ -62,14 +70,14 @@ unset printf_token_from_process
 
 空值、`replace-with-client-token` 和 `replace_with_your_token` 都表示未配置。缺少有效 `PRINTF_TOKEN` 时立即停止，读取 `references/get-token.md`，把其中的获取方式告诉用户，并提示用户取得后写入本地进程环境或本 skill 目录的 `.env`。不要猜测 Token，不要要求用户在聊天中发送 Token，也不要继续修改项目、启动 Client 或调用 Mapping API。
 
-Token 有效时再设置其余默认值：
+Token 有效时设置控制面默认值；只有 Compose Bridge 才设置 Compose 默认值：
 
 ```bash
 PRINTF_SERVER="${PRINTF_SERVER:-https://moon.lprintf.com}"
 PRINTF_SERVER="${PRINTF_SERVER%/}"
-PRINTF_BRIDGE_NETWORK="${PRINTF_BRIDGE_NETWORK:-gateway}"
-PRINTF_CLIENT_COMPOSE="${PRINTF_CLIENT_COMPOSE:-./docker-compose.yml}"
 ```
+
+Compose Bridge 继续执行下面的步骤 2 至 6。选择 Native 时，立即完整读取并执行 `references/native.md`，直到 Native Client 在线，再从下面的“选择域名”继续；不要执行 Compose 专用步骤。
 
 ### 2. 调整应用 Compose
 
@@ -94,6 +102,8 @@ PRINTF_CLIENT_COMPOSE="${PRINTF_CLIENT_COMPOSE:-./docker-compose.yml}"
 
 ```bash
 set +x
+PRINTF_BRIDGE_NETWORK="${PRINTF_BRIDGE_NETWORK:-gateway}"
+PRINTF_CLIENT_COMPOSE="${PRINTF_CLIENT_COMPOSE:-./docker-compose.yml}"
 : "${PRINTF_TOKEN:?PRINTF_TOKEN is required}"
 : "${PRINTF_TARGET_HOST:?PRINTF_TARGET_HOST is required}"
 : "${PRINTF_TARGET_PORT:?PRINTF_TARGET_PORT is required}"
@@ -161,7 +171,7 @@ domains_json="$(curl --fail-with-body --silent --show-error \
 
 按 `domain_name` 精确匹配并使用对应整数 `id`。返回空数组时停止，提示用户先在控制面为 Client 绑定域名。不要依赖 `Host` header 推断域名。
 
-### 8. 幂等写入 Bridge 映射
+### 8. 幂等写入 Mapping
 
 重新读取 `/api/client/config`，按以下键查找：
 
@@ -170,7 +180,7 @@ domains_json="$(curl --fail-with-body --silent --show-error \
 
 匹配超过一条时停止并报告重复数据。不要调用非幂等的 `/toggle`。
 
-更新已有映射：
+Compose Bridge 使用非空 Docker alias；更新已有映射：
 
 ```bash
 payload="$(jq -cn \
@@ -186,7 +196,7 @@ curl --fail-with-body --silent --show-error \
   "${PRINTF_SERVER}/api/client/mappings/${PRINTF_MAPPING_ID}"
 ```
 
-项目站点没有匹配项时创建映射；默认站点禁止创建空 `subdomain`：
+Compose Bridge 的项目站点没有匹配项时创建映射；默认站点禁止创建空 `subdomain`：
 
 ```bash
 payload="$(jq -cn \
@@ -204,16 +214,18 @@ curl --fail-with-body --silent --show-error \
   "${PRINTF_SERVER}/api/client/mappings"
 ```
 
-`POST` 和 `PUT` 只返回操作状态。成功后必须再次读取 `/api/client/config`，用相同键取得 `id`、`target_host`、`target_port`、`is_active` 和 `full_subdomain`。字段与请求不一致或 `full_subdomain` 为空时视为失败。
+Native 必须使用 `references/native.md` 中 `target_host: null` 的 payload，不得复用上面的 Compose payload。
+
+`POST` 和 `PUT` 只返回操作状态。成功后必须再次读取 `/api/client/config`，用相同键取得 `id`、`target_host`、`target_port`、`is_active` 和 `full_subdomain`。Compose 的 `target_host` 必须等于 alias；Native 的 `target_host` 必须为 `null`。字段与请求不一致或 `full_subdomain` 为空时视为失败。
 
 ### 9. 验证公网链路
 
 1. 调用 `GET /api/client/mappings/{id}/stats`，检查 `client_online`、`best.wg_healthy`、`best.target_offline`、`best.http_status` 和 `best.relay_status`。
 2. 请求 `https://{full_subdomain}` 的已知健康检查路径，限制连接和总超时，并保留实际 HTTP 状态。
-3. 只有映射已激活、目标 alias 与端口一致且公网请求符合应用预期时才报告成功。
-4. 失败时根据原始响应区分 Docker DNS/alias、Client、WireGuard、Node upstream、DNS/TLS 和应用 HTTP 错误，不做猜测性修复。
+3. 只有映射已激活、所选模式的目标与端口一致且公网请求符合应用预期时才报告成功。
+4. 失败时根据原始响应区分 Compose DNS/alias、Native 本地监听、Client、加密传输、Node upstream、DNS/TLS 和应用 HTTP 错误，不做猜测性修复。
 
-最终只返回公网 HTTPS URL、对应入口服务/alias/容器端口和验证结果。不要返回 token、完整 `.env`、私钥或 WireGuard 配置。
+最终只返回公网 HTTPS URL、所选运行方式、对应入口服务与端口和验证结果。不要返回 token、完整 `.env`、私钥或完整传输配置。只有问题符合 Native 发布包缺陷条件时才读取并执行 `references/report-issue.md`。
 
 ## API 约定
 
