@@ -37,6 +37,20 @@ docker compose -f docker-compose.alpine.yml up -d
 
 应用只需按 [compose.service.yml](compose.service.yml) 把 HTTP 入口加入 `gateway` 网络。Target Service 填写 Docker alias 和容器内部端口，例如 `http://my-app:8080`；不需要为 Printf 暴露宿主机端口。
 
+## Native 二进制
+
+没有 Docker 或明确需要原生运行时，可下载当前公开版本 [`client-v0.0.2`](https://github.com/lprintf/printf-client-releases/releases/latest)：
+
+| 平台 | 下载包 |
+| --- | --- |
+| Linux amd64 | `printf-client-linux-amd64.tar.gz` |
+| Linux arm64 | `printf-client-linux-arm64.tar.gz` |
+| macOS Intel | `printf-client-macos-amd64.tar.gz` |
+| macOS Apple Silicon | `printf-client-macos-arm64.tar.gz` |
+| Windows amd64 | `printf-client-windows-amd64.zip` |
+
+每个包都提供同名 `.sha256` 校验文件。Native Release 与 Docker 镜像使用独立版本线；当前 Native 版本是 `v0.0.2`，Docker 镜像版本是 `v0.2`。安装要求见 [平台安装](docs/platforms.md)。
+
 ## 更多文档
 
 | 文档 | 用途 |
