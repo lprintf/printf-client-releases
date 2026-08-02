@@ -4,22 +4,21 @@
 
 ## 直接交给 AI Agent（推荐）
 
-把下面整段复制给能读取本地文件并执行命令的 AI Agent：
+无需 clone 本仓库。直接把下面整段复制给能访问 GitHub、读取本地项目并执行命令的 AI Agent：
 
 ```text
-请读取当前仓库的 `AGENT-PUBLISH.md`，使用其中的 `$printf-client-release` skill，把我当前工作区中的 Docker Compose HTTP 服务发布为 Printf 公网 HTTPS 地址。先检查运行环境和配置；缺少 `PRINTF_TOKEN` 时停止，并告诉我按照 `GET-TOKEN.md` 获取内测 Token，不要猜测 Token，也不要要求我在聊天中公开 Token。不要安装额外的宿主机网络工具，不要为 Printf 暴露应用宿主机端口。
+请读取 https://github.com/lprintf/printf-client-releases/blob/main/AGENT-PUBLISH.md，使用其中的 `$printf-client-release` skill，把我当前工作区中的 Docker Compose HTTP 服务发布为 Printf 公网 HTTPS 地址。如果本地没有该 Skill，按照文档从官方 Raw URL 获取最小文件集，不要 clone 整个 release 仓库。先检查运行环境和配置；缺少 `PRINTF_TOKEN` 时停止，并告诉我按照 https://github.com/lprintf/printf-client-releases/blob/main/GET-TOKEN.md 获取内测 Token，不要猜测 Token，也不要要求我在聊天中公开 Token。不要安装额外的宿主机网络工具，不要为 Printf 暴露应用宿主机端口。
 ```
 
-无需提前准备 Token。Agent 检查后如果发现缺少 Token，会告诉你如何获取和配置；取得方式也可直接查看 [GET-TOKEN.md](GET-TOKEN.md)。
+无需提前准备 Token。Agent 会自行取得所需公开文件；如果发现缺少 Token，会告诉你如何获取和配置。取得方式也可直接查看 [GET-TOKEN.md](GET-TOKEN.md)。
 
 Agent 入口见 [AGENT-PUBLISH.md](AGENT-PUBLISH.md)，完整 Skill 位于 [`skills/printf-client-release/`](skills/printf-client-release/SKILL.md)。
 
 ## 手动使用 Docker Compose
 
-先[获取内测 Token](GET-TOKEN.md)，再在 Git Bash 或其他兼容 shell 中执行：
+先[获取内测 Token](GET-TOKEN.md)。不 clone 仓库时，把 [`.env.example`](.env.example) 下载为 `.env`，再把 [docker-compose.yml](docker-compose.yml) 下载到同一持久化目录。然后在该目录使用 Git Bash 或其他兼容 shell 执行：
 
 ```bash
-cp .env.example .env
 chmod 0600 .env
 # 编辑 .env，填写 PRINTF_TOKEN
 
@@ -29,7 +28,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Windows Docker Desktop 使用 Alpine 变体：
+Windows Docker Desktop 还需下载 [docker-compose.alpine.yml](docker-compose.alpine.yml)，并使用 Alpine 变体：
 
 ```bash
 docker compose -f docker-compose.alpine.yml pull

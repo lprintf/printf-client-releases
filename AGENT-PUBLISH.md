@@ -1,6 +1,19 @@
 # 使用 AI Agent 发布 Printf
 
-请完整读取并严格执行 [`skills/printf-client-release/SKILL.md`](skills/printf-client-release/SKILL.md)，把用户当前工作区中的 Docker Compose HTTP 服务发布为 Printf 公网 HTTPS 地址。
+请完整读取并严格执行官方 [`skills/printf-client-release/SKILL.md`](https://github.com/lprintf/printf-client-releases/blob/main/skills/printf-client-release/SKILL.md)，把用户当前工作区中的 Docker Compose HTTP 服务发布为 Printf 公网 HTTPS 地址。
+
+## 获取 Skill
+
+用户不需要 clone `printf-client-releases` 仓库。
+
+- 本地已有完整 `skills/printf-client-release/` 时直接使用。
+- 本地没有时，在目标项目之外选择一个不会被 Git 提交、重启后仍保留的私有目录。
+- 从 `https://raw.githubusercontent.com/lprintf/printf-client-releases/main/skills/printf-client-release/` 下载下列最小文件集，并保持相对目录结构：
+  `SKILL.md`、`.env.example`、`.gitignore`、`docker-compose.yml`、`docker-compose.alpine.yml`、`compose.service.yml` 和 `references/get-token.md`。
+- 每个文件都必须下载成功且非空。失败时报告原始错误并停止，不要凭记忆重建内容，也不要把远程内容通过管道直接交给 shell 执行。
+- Client 的本地配置和传输数据会保存在该目录，因此发布完成后不要把它当作临时目录删除。
+
+取得文件后，把该目录作为 Skill 工作目录，先完整读取 `SKILL.md`，再开始执行。
 
 ## 执行顺序
 
