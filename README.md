@@ -7,7 +7,7 @@
 无需 clone 本仓库。直接把下面整段复制给能访问 GitHub、读取本地项目并执行命令的 AI Agent：
 
 ```text
-请读取 https://github.com/lprintf/printf-client-releases/blob/main/AGENT-PUBLISH.md，使用其中的 `$printf-client-release` skill，把我当前工作区中的 HTTP 服务发布为 Printf 公网 HTTPS 地址。如果本地没有该 Skill，按照文档从官方 Raw URL 获取最小文件集，不要 clone 整个 release 仓库。先检查运行环境和配置；Docker 可用时使用 Compose Bridge，Docker 命令不存在且应用能脱离 Docker 运行时使用校验过的 Native Client，纯 Compose 应用没有 Docker 时停止。缺少 `PRINTF_TOKEN` 时停止，并告诉我按照 https://github.com/lprintf/printf-client-releases/blob/main/GET-TOKEN.md 获取内测 Token，不要猜测 Token，也不要要求我在聊天中公开 Token。不要安装额外的宿主机网络工具，不要为 Printf 暴露应用宿主机端口。只有确认是 Native 发布包缺陷时才生成脱敏 Issue 草稿，搜索重复 Issue，并在我确认公开内容后提交；安全问题改用私密漏洞报告。
+请读取 https://github.com/lprintf/printf-client-releases/blob/main/AGENT-PUBLISH.md，使用其中的 `$printf-client-release` skill，把我当前工作区中的 HTTP 服务发布为 Printf 公网 HTTPS 地址。如果本地没有该 Skill，按照文档从官方 Raw URL 获取最小文件集，不要 clone 整个 release 仓库。先检查运行环境和配置；Docker 可用时使用 Compose Bridge，Docker 命令不存在且应用能脱离 Docker 运行时使用校验过的 Native Client，纯 Compose 应用没有 Docker 时停止。多服务网站必须选择一个同时提供前端并代理 API、认证路径的唯一出口，只有该出口同时加入私有网络和 Printf `gateway` 网络，不要只发布后端，不要把数据库或内部服务加入 `gateway`。缺少 `PRINTF_TOKEN` 时停止，并告诉我按照 https://github.com/lprintf/printf-client-releases/blob/main/GET-TOKEN.md 获取内测 Token，不要猜测 Token，也不要要求我在聊天中公开 Token。不要安装额外的宿主机网络工具，不要为 Printf 暴露应用宿主机端口。只有确认是 Native 发布包缺陷时才生成脱敏 Issue 草稿，搜索重复 Issue，并在我确认公开内容后提交；安全问题改用私密漏洞报告。
 ```
 
 无需提前准备 Token。Agent 会自行取得所需公开文件；如果发现缺少 Token，会告诉你如何获取和配置。取得方式也可直接查看 [GET-TOKEN.md](GET-TOKEN.md)。
@@ -35,7 +35,14 @@ docker compose -f docker-compose.alpine.yml pull
 docker compose -f docker-compose.alpine.yml up -d
 ```
 
-应用只需按 [compose.service.yml](compose.service.yml) 把 HTTP 入口加入 `gateway` 网络。Target Service 填写 Docker alias 和容器内部端口，例如 `http://my-app:8080`；不需要为 Printf 暴露宿主机端口。
+按项目结构选择 Compose 参考：
+
+| 项目结构 | 参考 |
+| --- | --- |
+| 单体 HTTP 服务 | [compose.service.yml](compose.service.yml) |
+| 前端、后端、数据库等多服务网站 | [compose.gateway.yml](compose.gateway.yml) 和 [唯一出口说明](skills/printf-client-release/references/multi-service.md) |
+
+多服务项目只有 Nginx、认证网关等唯一出口同时加入私有网络和 `gateway`；后端、数据库和 Redis 只留在私有网络。Target Service 填写唯一出口的 Docker alias 和容器内部端口，例如 `http://my-app:8080`，不需要为 Printf 暴露宿主机端口。
 
 ## Native 二进制
 

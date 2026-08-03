@@ -1,0 +1,60 @@
+name: ${COMPOSE_PROJECT_NAME:-app}
+
+services:
+  gateway:
+    build:
+      context: ./frontend
+    depends_on:
+      api:
+        condition: service_started
+    expose:
+      - "${PRINTF_TARGET_PORT:-8080}"
+    restart: unless-stopped
+    networks:
+      default:
+      gateway:
+        aliases:
+          - ${COMPOSE_PROJECT_NAME:-app}
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+    depends_on:
+      database:
+        condition: service_healthy
+    expose:
+      - "8000"
+    restart: unless-stopped
+    networks:
+      default:
+
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - database_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      default:
+
+volumes:
+  database_data:
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-app}-private
+  gateway:
+    external: true
+    name: ${PRINTF_BRIDGE_NETWORK:-gateway}

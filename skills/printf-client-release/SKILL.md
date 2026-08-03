@@ -1,6 +1,6 @@
 ---
 name: printf-client-release
-description: 通过 Docker Compose Bridge 或 Native Client 和 Client API，把现有 HTTP 服务发布为公网 HTTPS 地址。用于用户要求部署、公开、映射、上线或检查 Web 服务，Docker 可能不可用、尚未配置 Printf token，或 Native 二进制疑似故障需要生成脱敏 Issue 的场景。
+description: 通过 Docker Compose Bridge 或 Native Client 和 Client API，把现有 HTTP 服务发布为公网 HTTPS 地址。用于用户要求部署、公开、映射、上线或检查单体及前端/后端/数据库多服务网站，Docker 可能不可用、尚未配置 Printf token，或 Native 二进制疑似故障需要生成脱敏 Issue 的场景。
 ---
 
 # 使用 Printf 发布 HTTP 服务
@@ -9,8 +9,8 @@ description: 通过 Docker Compose Bridge 或 Native Client 和 Client API，把
 
 - Docker 和 Compose 正常可用时必须使用 Compose Bridge。镜像已包含运行组件，不在宿主机额外安装 Client 网络辅助工具。
 - Docker 命令不存在时，只有目标 HTTP 服务已经在宿主机运行或能脱离 Docker 原生启动，才使用 Native Client，并完整读取 `references/native.md`。Native Client 不能替代 Docker 启动纯 Compose 应用。
-- Compose Bridge 先读取本目录的 `compose.service.yml` 和 `docker-compose.yml`。Windows Docker Desktop 使用 `docker-compose.alpine.yml`。
-- Compose Bridge 只把公网 HTTP 入口加入 external network，并使用唯一 Docker alias 和容器内部端口。Native Mapping 必须使用默认本地目标和宿主机服务端口。
+- Compose Bridge 单体服务先读取 `compose.service.yml`；前端、后端、数据库等多服务项目必须读取 `compose.gateway.yml` 和 `references/multi-service.md`。Client 使用 `docker-compose.yml`，Windows Docker Desktop 使用 `docker-compose.alpine.yml`。
+- Compose Bridge 只把一个能完整提供前端、API 和认证路径的公网出口加入 external network，并使用唯一 Docker alias 和容器内部端口。Native Mapping 必须使用默认本地目标和宿主机服务端口。
 - 应用已有认证网关时发布认证网关，不绕过现有认证层。数据库、Redis 和内部 API 保持私有。
 - 一个 token 只运行一个 Client。控制面显示在线但本机没有对应 Client 时停止，不启动第二个实例。
 - 不调用 Admin API，不刷新 token，不删除映射。删除或替换用户资源前另行确认。
@@ -81,16 +81,23 @@ Compose Bridge 继续执行下面的步骤 2 至 6。选择 Native 时，立即�
 
 ### 2. 调整应用 Compose
 
-读取用户项目的 Compose、Dockerfile、反向代理和健康检查配置，确定唯一的公网 HTTP 入口及其容器内部端口。参考 `compose.service.yml` 修改现有 Compose：
+读取用户项目的 Compose、Dockerfile、前端请求、反向代理和健康检查配置，确定能完整提供网站的唯一公网 HTTP 出口及其容器内部端口。不要只选择最先发现或已有健康检查的后端。
+
+- 只有一个应用服务时读取 `compose.service.yml`。
+- 存在前端、后端、数据库、Redis、认证或任务服务中的多个角色时，先完整读取 `references/multi-service.md` 和 `compose.gateway.yml`。
+
+修改现有 Compose：
 
 1. 保留项目的私有默认网络。
-2. 只给入口服务增加 external network 和唯一 alias。
-3. 不给数据库、Redis 或纯内部服务增加 external network。
-4. 不添加仅供 Printf 使用的 `ports`。已有 `ports` 若还承担本机访问用途，不擅自删除。
-5. 保留或补充项目原生可执行的 healthcheck；不要假设镜像一定包含 `curl`、`wget` 或 Python。
-6. 有认证网关时，通过 `depends_on` 健康条件等待后端，并把 external network 放在认证网关上。
+2. 选择且只选择一个 Nginx、认证网关或等价反向代理作为公网出口。
+3. 让唯一出口同时加入私有网络和 external network，并声明唯一 alias。
+4. 确认出口同时提供前端、静态资源并代理页面实际依赖的 API、认证和实时连接路径。
+5. 数据库、Redis、后端内部端点和任务服务只加入私有网络。
+6. 不添加仅供 Printf 使用的 `ports`。已有 `ports` 若还承担本机访问用途，不擅自删除。
+7. 保留或补充项目原生可执行的 healthcheck；不要假设镜像一定包含 `curl`、`wget` 或 Python。
+8. 有认证网关时，通过有效健康条件等待后端，并把 external network 只放在认证网关上。
 
-`compose.service.yml` 是结构参考，不覆盖用户现有服务定义。项目没有 Compose 时才以它为起点，并替换示例中的 service、build、端口和 alias。
+两个 Compose 文件都是结构参考，不覆盖用户现有服务定义。项目没有 Compose 时才以对应文件为起点，并替换示例中的 service、build、路由、端口和 alias。
 
 ### 3. 准备 Compose 和 Client 配置
 

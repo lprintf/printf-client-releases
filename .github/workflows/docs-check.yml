@@ -47,6 +47,7 @@ jobs:
           cmp docker-compose.yml skills/printf-client-release/docker-compose.yml
           cmp docker-compose.alpine.yml skills/printf-client-release/docker-compose.alpine.yml
           cmp compose.service.yml skills/printf-client-release/compose.service.yml
+          cmp compose.gateway.yml skills/printf-client-release/compose.gateway.yml
           cmp GET-TOKEN.md skills/printf-client-release/references/get-token.md
 
       - name: Lint Agent Protocol OpenAPI
