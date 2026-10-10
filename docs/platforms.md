@@ -34,6 +34,24 @@ sudo install -m 0755 printf-client /usr/local/bin/printf-client
 
 使用 [systemd unit](../packaging/printf-client.service) 运行时，进程默认以 root 身份执行并管理 `/var/lib/printf-client` 与 `printf0`。
 
+### 配置
+
+创建 `/etc/printf-client.env`：
+
+```ini
+PRINTF_TOKEN=<你的 token>
+PRINTF_SERVER=https://moon.lprintf.com
+PRINTF_RUNTIME_MODE=native
+PRINTF_BRIDGE_MODE=false
+```
+
+然后启用 systemd 服务：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now printf-client
+```
+
 ### 检查
 
 ```bash
